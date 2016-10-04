@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="3.0" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd">
+    <servlet>
+        <servlet-name>ServerLink</servlet-name>
+        <servlet-class>com.quest.servlets.ServerLink</servlet-class>
+          <init-param>
+            <param-name>version-no</param-name>
+            <param-value>2.0.0.0</param-value>
+         </init-param>
+           <init-param>
+            <param-name>version-name</param-name>
+            <param-value>Tangerine</param-value>
+         </init-param>
+         <init-param>
+            <param-name>debug-mode</param-name>
+            <param-value>true</param-value>
+        </init-param>
+          <init-param>
+            <param-name>nodes</param-name>
+            <param-value>
+            mcp-node-0,mcp-node-1,mcp-node-2,
+            mcp-node-3,mcp-node-4,mcp-node-5,
+            mcp-node-6,mcp-node-7,mcp-node-8
+            </param-value>
+        </init-param>
+         <init-param>
+            <param-name>external-services</param-name>
+            <param-value>
+              com.mcp.MCPService
+            </param-value>
+        </init-param>
+         <init-param>
+            <param-name>template-request</param-name>
+            <param-value>{"request_header":{"request_svc":"","request_msg":"","session_id":""},"request_object":{}}</param-value>
+        </init-param>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ServerLink</servlet-name>
+        <url-pattern>/server</url-pattern>
+    </servlet-mapping>
+    <session-config>
+        <session-timeout>
+            30
+        </session-timeout>
+    </session-config>
+</web-app>
