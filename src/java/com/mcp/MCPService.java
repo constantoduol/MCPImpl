@@ -77,7 +77,8 @@ public class MCPService implements Serviceable {
                 .etaMillis(System.currentTimeMillis()));//start executing the task now!
     }
     
-    public void aggregate(){
+    @Endpoint(name="aggregate")
+    public void aggregate(Server serv, ClientWorker worker){
         //the best way to aggregate is store the results
         //in java memory and load to javascript when needed
     }
