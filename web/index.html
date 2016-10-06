@@ -10,12 +10,26 @@
          <style>
             
              body {
-                 overflow: hidden;
+                 overflow-x: hidden;
                  padding : 10px;
              }
              #script {
                  width : 600px;
                  height : 500px;
+             }
+             #logs {
+                 padding:15px;
+             }
+             
+             .time {
+                 color : red;
+                 font-size: 11px;
+                 margin-right: 5px;
+             }
+             
+             .log {
+                 color : green;
+                 font-size: 11px;
              }
          </style>
     </head>
@@ -28,6 +42,9 @@
                 </div>
             </div>
             <input type="button" onclick="app.runScript()" class="btn" value="Run Script"/>
+        </div>
+        <div id="logs">
+            
         </div>
     </body>
 </html>

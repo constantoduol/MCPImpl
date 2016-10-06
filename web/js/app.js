@@ -15,13 +15,46 @@ App.prototype.runScript = function () {
     app.xhr(data, "mcp_service", "run_script", {
         load: false,
         success: function(resp){
-            console.log(resp);
+            app.requestId = resp.response.data;
+            app.addLog("Request received, processing initiated");
+            app.pollServer(app.requestId);
         },
         error: function(err){
             console.log(err);
         }
     });
 };
+
+App.prototype.addLog = function(logs){
+    var logArea = $("#logs");
+    logs.reverse();
+    $.each(logs,function(x, log){
+       var date = new Date().toLocaleTimeString();
+       var logHtml = $("<div><span class='time'>"+date+"</span><span class='log'>"+log+"</span></div>"); 
+       logArea.prepend(logHtml);
+       if(x === logs.length - 1) 
+           logArea.prepend($("<div><span class='time'>"
+               +date+"</span><span class='log'>---------------------------------------</span></div>"));
+    });
+};
+
+App.prototype.pollServer = function (reqId) {
+    var data = {
+        request_id : reqId
+    };
+    setInterval(function(){
+        app.xhr(data, "mcp_service", "fetch_messages", {
+            success: function (resp) {
+                app.addLog(resp.response.data);
+            },
+            error: function (err) {
+                console.log(err);
+            }
+        });
+    }, 5000);
+
+};
+
 
 
 App.prototype.xhr = function (data, svc, msg, func) {
