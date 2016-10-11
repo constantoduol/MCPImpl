@@ -29,10 +29,6 @@
               com.mcp.MCPService
             </param-value>
         </init-param>
-         <init-param>
-            <param-name>template-request</param-name>
-            <param-value>{"request_header":{"request_svc":"","request_msg":"","session_id":""},"request_object":{}}</param-value>
-        </init-param>
     </servlet>
     <servlet-mapping>
         <servlet-name>ServerLink</servlet-name>

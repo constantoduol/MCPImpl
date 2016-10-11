@@ -16,7 +16,7 @@ App.prototype.runScript = function () {
         load: false,
         success: function(resp){
             app.requestId = resp.response.data;
-            app.addLog("Request received, processing initiated");
+            app.addLog(["Request received, processing initiated"]);
             app.pollServer(app.requestId);
         },
         error: function(err){
@@ -25,7 +25,26 @@ App.prototype.runScript = function () {
     });
 };
 
+App.prototype.killScript = function () {
+    var sure = confirm("Are you sure you want to do this?");
+    if(!sure) return;
+    var data = {
+        request_id: app.requestId
+    };
+    app.xhr(data, "mcp_service", "kill_script", {
+        load: false,
+        success: function (resp) {
+            app.requestId = resp.response.data;
+            app.addLog(["Kill script initiated, may take time to complete!"]);
+        },
+        error: function (err) {
+            console.log(err);
+        }
+    });
+};
+
 App.prototype.addLog = function(logs){
+    if(!logs) return;
     var logArea = $("#logs");
     logs.reverse();
     $.each(logs,function(x, log){
@@ -45,6 +64,7 @@ App.prototype.pollServer = function (reqId) {
     setInterval(function(){
         app.xhr(data, "mcp_service", "fetch_messages", {
             success: function (resp) {
+                console.log(resp);
                 app.addLog(resp.response.data);
             },
             error: function (err) {

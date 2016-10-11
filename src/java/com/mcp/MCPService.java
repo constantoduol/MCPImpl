@@ -21,12 +21,10 @@ import java.util.HashMap;
 import java.util.StringTokenizer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-import javax.script.ScriptException;
 import javax.servlet.ServletConfig;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 /**
  *
@@ -39,7 +37,15 @@ public class MCPService implements Serviceable {
     
     private HashMap<String, String> aggregatedData = new HashMap();
     
-    private HashMap<String, ArrayList> eventLog = new HashMap(); 
+    private HashMap<String, ArrayList> eventLog = new HashMap();
+    
+    //how many data fetches, this is loosely translated as how many
+    //data aggregations are done for a given request id
+    private HashMap<String, Integer> fetchCount = new HashMap();
+    
+    private HashMap<String, Boolean> killProcess = new HashMap();
+    
+    private final String KILL_MESSAGE = "!!kill_process";
     
     private static String mcpScript;
     
@@ -72,11 +78,11 @@ public class MCPService implements Serviceable {
         String aggregator = request.optString("aggregator");
         String script = request.optString("script");
         String requestId = request.optString("request_id");
-        String node = ApiProxy.getCurrentEnvironment().getAppId();
+        String node = getAppId();
         Queue queue = QueueFactory.getDefaultQueue();
         queue.add(TaskOptions
                 .Builder
-                .withPayload(new BackgroundTask(aggregator, requestId, script, node))
+                .withPayload(new BackgroundTask(aggregator, requestId, script, node, mcpScript))
                 .etaMillis(System.currentTimeMillis()));//start executing the task now!
     }
     
@@ -89,28 +95,47 @@ public class MCPService implements Serviceable {
         addLog(reqId, msg);
     }
     
+    @Endpoint(name="kill_script")
+    public void killScript(Server serv, ClientWorker worker){
+        JSONObject request = worker.getRequestData();
+        killProcess(worker);
+        serv.messageToClient(worker.setResponseData(Message.SUCCESS));
+    }
+    
+    private void killProcess(ClientWorker worker){
+        JSONObject request = worker.getRequestData();
+        String reqId = request.optString("request_id");
+        try {
+            //check if we have already killed this process
+            Boolean processKilled = killProcess.get(reqId);
+            if (processKilled != null && processKilled == true) {
+                return;
+            }
+            //run the onFinish handler
+            String script = request.optString("script");
+            HashMap params = new HashMap();
+            params.put("_all_data_", aggregatedData.get(reqId));
+            params.put("_request_id_", reqId);
+            params.put("_service_", this);
+            params.put("_fetch_count_", fetchCount.get(reqId));
+            String onFinish = "\n" + "if(onFinish) onFinish();";
+            //call the aggregate function with the response
+            Server.execScript(mcpScript + script + onFinish, params);
+            killProcess.put(reqId, true);
+            addLog(reqId, "process killed");
+            addLog(reqId, "on finish called");
+        } catch (Exception e) {
+            e.printStackTrace();
+            addLog(reqId, e.getLocalizedMessage());
+        }
+    }
+    
     private void interceptMessages(ClientWorker worker) {
         JSONObject request = worker.getRequestData();
         String msg = request.optString("message");
-        String reqId = request.optString("request_id");
-        if(msg.equals("!!complete")){
-            try {
-                //run the onFinish handler
-                String script = request.optString("script");
-                
-                ScriptEngineManager factory = new ScriptEngineManager();
-                ScriptEngine engine = factory.getEngineByName("JavaScript");
-                //call the aggregate function with the response
-                engine.eval(mcpScript + script);
-                engine.put("_all_data_", aggregatedData.get(reqId));
-                engine.put("_request_id_", reqId);
-                engine.put("_service_", this);
-                engine.eval("if(onFinish) onFinish();");
-                addLog(reqId, "on finish called");
-            } catch (ScriptException ex) {
-                addLog(reqId, ex.getMessage());
-                Logger.getLogger(MCPService.class.getName()).log(Level.SEVERE, null, ex);
-            }
+        if(msg.equals(KILL_MESSAGE)){
+            io.out("kill process called");
+            killProcess(worker);
         }
     }
     
@@ -140,14 +165,23 @@ public class MCPService implements Serviceable {
             //in java memory and load to javascript when needed
             String resp = request.optString("response");
             String script = request.optString("script");
-            ScriptEngineManager factory = new ScriptEngineManager();
-            ScriptEngine engine = factory.getEngineByName("JavaScript");
+            updateFetchCount(reqId);
             //call the aggregate function with the response
             script = URLDecoder.decode(script, "utf-8");
-            engine.eval(script);
-            engine.put("_aggregated_data_", aggregatedData.get(reqId));
-            engine.put("_new_data_", URLDecoder.decode(resp, "utf-8"));
-            aggregatedData.put(reqId, (String)engine.eval("if(aggregate) aggregate();"));
+            HashMap params = new HashMap(); 
+            params.put("_aggregated_data_", aggregatedData.get(reqId));
+            params.put("_new_data_", URLDecoder.decode(resp, "utf-8"));
+            params.put("_service_", this);
+            params.put("_request_id_", reqId);
+            params.put("_fetch_count_", fetchCount.get(reqId));
+            String aggrScript = "\n" + "if(aggregate) aggregate();";
+            Object result = Server.execScript(script + aggrScript, params);
+            aggregatedData.put(reqId, (String)result);
+            JSONObject respObj = new JSONObject();
+            respObj.put("fetch_count", fetchCount.get(reqId));
+            respObj.put("kill_process", killProcess.get(reqId));
+            worker.setResponseData(respObj);
+            serv.messageToClient(worker);
         } catch (Exception ex) {
             addLog(reqId, ex.getLocalizedMessage());
             Logger.getLogger(MCPService.class.getName()).log(Level.SEVERE, null, ex);
@@ -155,19 +189,43 @@ public class MCPService implements Serviceable {
         
     }
     
-    private void sendHandshake(Server serv, ClientWorker worker) throws Exception {
-        String aggregator = ApiProxy.getCurrentEnvironment().getAppId();
-        String script = worker.getRequestData().optString("script");
-        String requestId = new UniqueRandom(20).nextMixedRandom();
-        //inform other nodes that you are the aggregator
-        String encodedScript = URLEncoder.encode(script, "utf-8");
-        String params = "?svc=mcp_service&msg=handshake&"
-                + "aggregator="+aggregator+"&script="+encodedScript+"&request_id="+requestId;
-        //go through all the nodes and send a handshake signal
-        for(String node : allNodes.keySet()){
-            Server.get(allNodes.get(node) + params);
+    private synchronized void updateFetchCount(String requestId){
+        Integer count = fetchCount.get(requestId);
+        if(count == null) {
+            count = 1;
+            fetchCount.put(requestId, count);
         }
-        serv.messageToClient(worker.setResponseData(requestId));
+        fetchCount.put(requestId, ++count);
+    }
+    
+    private String getAppId(){
+        String appId = ApiProxy.getCurrentEnvironment().getAppId();
+        int index = appId.indexOf("~");
+        if(index > 0)
+            return appId.substring(index + 1);
+        return appId;
+        
+    }
+    
+    private void sendHandshake(Server serv, ClientWorker worker)  {
+        String requestId = new UniqueRandom(20).nextMixedRandom();
+        try {
+            String aggregator = getAppId();
+            String script = worker.getRequestData().optString("script");
+            //inform other nodes that you are the aggregator
+            String encodedScript = URLEncoder.encode(script, "utf-8");
+            String params = "?svc=mcp_service&msg=handshake&"
+                    + "aggregator="+aggregator+"&script="+encodedScript+"&request_id="+requestId;
+            //go through all the nodes and send a handshake signal
+            serv.messageToClient(worker.setResponseData(requestId));
+//            for(String node : allNodes.keySet()){
+//                Server.get(allNodes.get(node) + params);
+//            }
+            Server.get("http://localhost:8200/server" + params);
+        } catch (Exception ex) {
+            addLog(requestId, ex.getLocalizedMessage());
+            Logger.getLogger(MCPService.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
     
     public void loadMCPNodes(Server serv){
@@ -181,5 +239,12 @@ public class MCPService implements Serviceable {
         }
     }
     
-
+    public static void main(String [] args){
+        String appId = "s~mcp-node-0";
+        int index = appId.indexOf("~");
+        if (index > 0) {
+            io.out(appId.substring(index + 1));
+        }
+        
+    }
 }
