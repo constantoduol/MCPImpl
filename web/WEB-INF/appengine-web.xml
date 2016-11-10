@@ -8,4 +8,7 @@ xsi:schemaLocation='http://kenai.com/projects/nbappengine/downloads/download/sch
     <sessions-enabled>true</sessions-enabled>
     -->
     <threadsafe>false</threadsafe>
+    <system-properties>
+        <property name="appengine.api.urlfetch.defaultDeadline" value="60"/>
+    </system-properties>
 </appengine-web-app>
