@@ -18,9 +18,7 @@
         <init-param>
             <param-name>nodes</param-name>
             <param-value>
-            mcp-node-0,mcp-node-1,mcp-node-2,
-            mcp-node-3,mcp-node-4,mcp-node-5,
-            mcp-node-6,mcp-node-7,mcp-node-8
+            mcp-node-0
             </param-value>
         </init-param>
          <init-param>

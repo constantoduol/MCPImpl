@@ -20,8 +20,8 @@ function run() {
 function beforeNextData(){
     //return true to fetch next data
     //return false to fail next data fetch
-    _task_.sendMessage(_aggregator_state_.fetch_count);
-    if(_aggregator_state_.fetch_count > 5) 
+    _task_.sendMessage(_self_state_.fetch_count);
+    if(_self_state_.fetch_count > 5) 
         return false; //stop after approximately 600 messages
     return true;
 }
@@ -30,7 +30,7 @@ function beforeNextData(){
 //make sure it runs fast
 function aggregate() {
     var myData = JSON.parse(_new_data_);
-    _service_.sendMessage(_request_id_, "aggregating data");
+    _service_.addLog(_request_id_, "aggregating data");
     var aggr = JSON.parse(_aggregated_data_);
     if(!aggr) aggr = [];
     aggr = aggr.concat(myData);
@@ -41,8 +41,8 @@ function aggregate() {
 //it runs in the foreground
 function onFinish() {
     var data = JSON.parse(_all_data_);
-    _service_.sendMessage(_request_id_, "on finish called");
-    _service_.sendMessage(_request_id_, _all_data_);
+    _service_.addLog(_request_id_, "on finish called");
+    _service_.addLog(_request_id_, _all_data_);
     _service_.sendEmail(_request_id_, 
             "constant@echomobile.org", "Hello World", _all_data_);
 }
