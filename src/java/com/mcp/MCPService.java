@@ -38,17 +38,17 @@ import org.json.JSONObject;
  * @author conny
  */
 @WebService(name="mcp_service",privileged = "no")
-public class MCPService implements Serviceable, Serializable {
+public class MCPService implements Serviceable {
     
-    private ConcurrentHashMap<String, String> aggregatedData = new ConcurrentHashMap();
+    private static ConcurrentHashMap<String, String> aggregatedData = new ConcurrentHashMap();
     
-    private ConcurrentHashMap<String, ArrayList> eventLog = new ConcurrentHashMap();
+    private static ConcurrentHashMap<String, ArrayList> eventLog = new ConcurrentHashMap();
     
     //how many data fetches, this is loosely translated as how many
     //data aggregations are done for a given request id
-    private ConcurrentHashMap<String, Integer> fetchCount = new ConcurrentHashMap();
+    private static ConcurrentHashMap<String, Integer> fetchCount = new ConcurrentHashMap();
     
-    private ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
+    private static ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
     
     private static String mcpScript;
     
