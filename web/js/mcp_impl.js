@@ -45,4 +45,5 @@ function onFinish() {
     _service_.addLog(_request_id_, _all_data_);
     _service_.sendEmail(_request_id_, 
             "constant@echomobile.org", "Hello World", _all_data_);
+    return true;
 }

@@ -46,7 +46,6 @@ App.prototype.killScript = function () {
 App.prototype.addLog = function(logs){
     if(!logs) return;
     var logArea = $("#logs");
-    logs.reverse();
     $.each(logs,function(x, log){
        var date = new Date().toLocaleTimeString();
        var logHtml = $("<div><span class='time'>"+date+"</span><span class='log'>"+log+"</span></div>"); 

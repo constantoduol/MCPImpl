@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.StringTokenizer;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.mail.Session;
@@ -39,17 +40,17 @@ import org.json.JSONObject;
 @WebService(name="mcp_service",privileged = "no")
 public class MCPService implements Serviceable, Serializable {
     
-    private HashMap<String, String> aggregatedData = new HashMap();
+    private ConcurrentHashMap<String, String> aggregatedData = new ConcurrentHashMap();
     
-    private HashMap<String, ArrayList> eventLog = new HashMap();
+    private ConcurrentHashMap<String, ArrayList> eventLog = new ConcurrentHashMap();
     
     //how many data fetches, this is loosely translated as how many
     //data aggregations are done for a given request id
-    private HashMap<String, Integer> fetchCount = new HashMap();
+    private ConcurrentHashMap<String, Integer> fetchCount = new ConcurrentHashMap();
     
-    private HashMap<String, Boolean> killProcess = new HashMap();
+    private ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
     
-    private HashMap<String, String> scripts = new HashMap<String, String>();
+    private ConcurrentHashMap<String, String> scripts = new ConcurrentHashMap<String, String>();
     
     private final String KILL_MESSAGE = "!!kill_process";
     
@@ -119,11 +120,12 @@ public class MCPService implements Serviceable, Serializable {
             String onFinish = "\n" + "if(onFinish) onFinish();";
             //call the aggregate function with the response
             String script = scripts.get(reqId);
-            Server.execScript(mcpScript + script + onFinish, params);
+            Object finishResult = Server.execScript(mcpScript + script + onFinish, params);
             killProcess.put(reqId, true);
             aggregatedData.remove(reqId);
             fetchCount.remove(reqId);
             scripts.remove(reqId);
+            io.log("on finish returned -> "+finishResult, Level.INFO, null);
             addLog(reqId, "process killed");
             addLog(reqId, "on finish called");
         } catch (Exception e) {
