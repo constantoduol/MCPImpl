@@ -50,10 +50,6 @@ public class MCPService implements Serviceable, Serializable {
     
     private ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
     
-    private ConcurrentHashMap<String, String> scripts = new ConcurrentHashMap<String, String>();
-    
-    private final String KILL_MESSAGE = "!!kill_process";
-    
     private static String mcpScript;
     
     @Override
@@ -82,7 +78,6 @@ public class MCPService implements Serviceable, Serializable {
         io.log("self url -> "+selfUrl, Level.INFO, null);
         //inform other nodes that you are the aggregator
         String decodeScript = URLDecoder.decode(script, "utf-8");
-        scripts.put(requestId, decodeScript);
         io.log(decodeScript, Level.INFO, MCPService.class);
         Queue queue = QueueFactory.getDefaultQueue();
         queue.add(TaskOptions.Builder
@@ -98,14 +93,18 @@ public class MCPService implements Serviceable, Serializable {
     //runs on aggregator
     @Endpoint(name="kill_script")
     public void killScript(Server serv, ClientWorker worker){
-        killProcess(worker.getRequestData().optString("request_id"));
+        killProcess(worker);
         serv.messageToClient(worker.setResponseData("success"));
     }
     
 
     //runs on aggregator
-    private void killProcess(String reqId){
+    private void killProcess(ClientWorker worker){
+        JSONObject request = worker.getRequestData();
+        String reqId = request.optString("request_id");
+        String script = request.optString("script");
         try {
+            script = URLDecoder.decode(script, "utf-8");
             //check if we have already killed this process
             Boolean processKilled = killProcess.get(reqId);
             if (processKilled != null && processKilled == true) {
@@ -119,12 +118,11 @@ public class MCPService implements Serviceable, Serializable {
             params.put("_fetch_count_", fetchCount.get(reqId));
             String onFinish = "\n" + "if(onFinish) onFinish();";
             //call the aggregate function with the response
-            String script = scripts.get(reqId);
+    
             Object finishResult = Server.execScript(mcpScript + script + onFinish, params);
             killProcess.put(reqId, true);
             aggregatedData.remove(reqId);
             fetchCount.remove(reqId);
-            scripts.remove(reqId);
             io.log("on finish returned -> "+finishResult, Level.INFO, null);
             addLog(reqId, "process killed");
             addLog(reqId, "on finish called");
@@ -134,17 +132,9 @@ public class MCPService implements Serviceable, Serializable {
         }
     }
     
-    //runs on aggregator
-    private void interceptMessages(String reqId, String msg) {
-        if(msg.equals(KILL_MESSAGE)){
-            io.out("kill process called");
-            killProcess(reqId);
-        }
-    }
     
     //runs on aggregator
     public synchronized void addLog(String reqId, String event){
-        interceptMessages(reqId, event);
         ArrayList log = eventLog.get(reqId);
         if(log == null) log = new ArrayList();
         log.add(event);
@@ -153,7 +143,7 @@ public class MCPService implements Serviceable, Serializable {
     
     //runs on aggregator
     @Endpoint(name="fetch_messages")
-    public synchronized void fetchMessages(Server serv, ClientWorker worker){
+    public void fetchMessages(Server serv, ClientWorker worker){
         JSONObject request = worker.getRequestData();
         String reqId = request.optString("request_id");
         ArrayList log = eventLog.get(reqId);
@@ -170,7 +160,6 @@ public class MCPService implements Serviceable, Serializable {
         String reqId = request.optString("request_id");
         String msg = request.optString("message");
         io.log("bg message received-> "+msg + " req_id : "+reqId, Level.INFO, null);
-        interceptMessages(reqId, msg);
         addLog(reqId, msg);
     }
     
