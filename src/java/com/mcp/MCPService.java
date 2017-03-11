@@ -132,9 +132,8 @@ public class MCPService implements Serviceable, Serializable {
         }
     }
     
-    
-    //runs on aggregator
-    public synchronized void addLog(String reqId, String event){
+ 
+    public void addLog(String reqId, String event){
         ArrayList log = eventLog.get(reqId);
         if(log == null) log = new ArrayList();
         log.add(event);
