@@ -141,7 +141,7 @@ public class MCPService implements Serviceable, Serializable {
     }
     
     //runs on aggregator
-    public void addLog(String reqId, String event){
+    public synchronized void addLog(String reqId, String event){
         interceptMessages(reqId, event);
         ArrayList log = eventLog.get(reqId);
         if(log == null) log = new ArrayList();
@@ -151,7 +151,7 @@ public class MCPService implements Serviceable, Serializable {
     
     //runs on aggregator
     @Endpoint(name="fetch_messages")
-    public void fetchMessages(Server serv, ClientWorker worker){
+    public synchronized void fetchMessages(Server serv, ClientWorker worker){
         JSONObject request = worker.getRequestData();
         String reqId = request.optString("request_id");
         ArrayList log = eventLog.get(reqId);
