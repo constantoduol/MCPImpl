@@ -8,19 +8,22 @@
          <script type="text/javascript" src="js/jquery.js"></script>
          <script type="text/javascript" src="js/app.js"></script>
          <style>
-            
-             body {
-                 overflow-x: hidden;
-                 padding : 10px;
+             body{
+                 overflow: hidden;
              }
-             #script {
-                 width : 800px;
-                 height : 500px;
+             #editor { 
+                 position: absolute;
+                 top: 0;
+                 right: 500px;
+                 bottom: 100px;
+                 left: 0;
              }
              #logs {
                  padding:15px;
-                 width:90%;
                  overflow: auto;
+                 float: right;
+                 width:466px;
+                 height: 580px;
              }
              
              .time {
@@ -33,21 +36,37 @@
                  color : green;
                  font-size: 11px;
              }
+             .buttons {
+                 position: absolute;
+                 top:600px;
+             }
+             
+             .buttons input {
+                 margin: 10px;
+             }
          </style>
     </head>
     <body>
-        <div class="main">
-            <h2>Run Script</h2>
-            <div class="row">
-                <div class="col-md-12">
-                    <textarea id="script"></textarea>
-                </div>
-            </div>
-            <input type="button" onclick="app.runScript()" class="btn" value="Run Script"/>
-            <input type="button" onclick="app.killScript()" class="btn" value="Kill Script"/>
+        <div id="editor"></div>
+
+        <script src="js/ace/ace.js" type="text/javascript" charset="utf-8"></script>
+        <script src="js/ace/theme-monokai.js" type="text/javascript" charset="utf-8"></script>
+        <script src="js/ace/mode-javascript.js" type="text/javascript" charset="utf-8"></script>
+        <script>
+            var editor = ace.edit("editor");
+            editor.setTheme("ace/theme/monokai");
+            editor.getSession().setMode("ace/mode/javascript");
+            function runScript(){
+                app.runScript(editor);
+            }
+        </script>
+
+        <div id="logs"></div>
+        
+        <div class="buttons">
+            <input type="button" onclick="runScript()" class="btn btn-primary" value="Run Script"/>
+            <input type="button" onclick="app.killScript()" class="btn btn-primary" value="Kill Script"/>
         </div>
-        <div id="logs">
-            
-        </div>
+       
     </body>
 </html>

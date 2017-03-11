@@ -8,9 +8,9 @@ function App(){
     this.server = "/server";
 }
 
-App.prototype.runScript = function () {
+App.prototype.runScript = function (editor) {
     var data = {
-        script : encodeURIComponent($("#script").val())
+        script : encodeURIComponent(editor.getValue())
     };
     app.xhr(data, "mcp_service", "run_script", {
         load: false,

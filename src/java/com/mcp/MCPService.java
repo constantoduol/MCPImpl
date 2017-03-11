@@ -6,6 +6,7 @@ import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.api.utils.SystemProperty;
 import com.google.apphosting.api.ApiProxy;
 import com.quest.access.common.UniqueRandom;
+import com.quest.access.common.datastore.Datastore;
 import com.quest.access.common.io;
 import com.quest.access.control.Server;
 import com.quest.access.control.Server.BackgroundTask;
@@ -75,7 +76,7 @@ public class MCPService implements Serviceable, Serializable {
         JSONObject request = worker.getRequestData();
         String script = request.optString("script");
         String requestId = new UniqueRandom(20).nextMixedRandom();
-        String selfUrl = "https://" + getAppId() + ".appspot.com";
+        String selfUrl = "https://" + getAppId() + ".appspot.com/server";
         io.log("self url -> "+selfUrl, Level.INFO, null);
         //inform other nodes that you are the aggregator
         String decodeScript = URLDecoder.decode(script, "utf-8");
@@ -91,7 +92,6 @@ public class MCPService implements Serviceable, Serializable {
     private boolean onProduction(){
         return SystemProperty.environment.value() == SystemProperty.Environment.Value.Production;
     }
-    
     
     //runs on aggregator
     @Endpoint(name="kill_script")
@@ -178,8 +178,12 @@ public class MCPService implements Serviceable, Serializable {
             //the best way to aggregate is store the results
             //in java memory and load to javascript when needed
             String resp = request.optString("response");
+            String script = request.optString("script");
             updateFetchCount(reqId);
-            String script = scripts.get(reqId);
+            //call the aggregate function with the response
+            script = URLDecoder.decode(script, "utf-8");
+            io.log("aggregating data for req_id -> "+reqId, Level.INFO, null);
+            io.log("script => "+script, Level.WARNING, null);
             //call the aggregate function with the response
             HashMap params = new HashMap(); 
             params.put("_aggregated_data_", aggregatedData.get(reqId));
