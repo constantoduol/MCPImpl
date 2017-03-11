@@ -77,6 +77,7 @@ public class MCPService implements Serviceable, Serializable {
         String script = request.optString("script");
         String requestId = new UniqueRandom(20).nextMixedRandom();
         String selfUrl = "https://" + getAppId() + ".appspot.com/server";
+        //String selfUrl = "http://localhost:8200/server";
         io.log("self url -> "+selfUrl, Level.INFO, null);
         //inform other nodes that you are the aggregator
         String decodeScript = URLDecoder.decode(script, "utf-8");
@@ -155,6 +156,8 @@ public class MCPService implements Serviceable, Serializable {
         String reqId = request.optString("request_id");
         ArrayList log = eventLog.get(reqId);
         if(log == null) log = new ArrayList();
+        io.log("all logs ->"+eventLog, Level.INFO, null);
+        io.log("sending log ->" + log, Level.INFO, null);
         serv.messageToClient(worker.setResponseData(new JSONArray(log)));
         eventLog.put(reqId, new ArrayList());
     }
@@ -183,7 +186,6 @@ public class MCPService implements Serviceable, Serializable {
             //call the aggregate function with the response
             script = URLDecoder.decode(script, "utf-8");
             io.log("aggregating data for req_id -> "+reqId, Level.INFO, null);
-            io.log("script => "+script, Level.WARNING, null);
             //call the aggregate function with the response
             HashMap params = new HashMap(); 
             params.put("_aggregated_data_", aggregatedData.get(reqId));
