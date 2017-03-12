@@ -63,7 +63,6 @@ App.prototype.pollServer = function (reqId) {
     setInterval(function(){
         app.xhr(data, "mcp_service", "fetch_messages", {
             success: function (resp) {
-                console.log(resp);
                 app.addLog(resp.response.data.event);
             },
             error: function (err) {

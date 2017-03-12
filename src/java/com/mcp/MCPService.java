@@ -195,10 +195,6 @@ public class MCPService implements Serviceable {
         return new FilterPredicate(propName, FilterOperator.LESS_THAN, value);
     }
     
-    private static Filter lessThanOrEqualFilter(String propName, Object value) {
-        return new FilterPredicate(propName, FilterOperator.LESS_THAN_OR_EQUAL, value);
-    }
-    
     //runs on aggregator
     @Endpoint(name="fetch_messages")
     public void fetchMessages(Server serv, ClientWorker worker){
@@ -206,10 +202,12 @@ public class MCPService implements Serviceable {
         String reqId = request.optString("request_id");
         Long lastTimestamp = lastLogFetch.get(reqId);
         if(lastTimestamp == null) lastTimestamp = 0l;
+        io.log("last timestamp -> "+lastTimestamp, Level.INFO, null);
+        io.log("current timestamp -> "+System.currentTimeMillis(), Level.INFO, null);
         Filter[] filters = new Filter[]{
             equalFilter("request_id", reqId),
             greaterThanOrEqualFilter("created", lastTimestamp),
-            lessThanOrEqualFilter("created", System.currentTimeMillis()) 
+            lessThanFilter("created", System.currentTimeMillis()) 
         };
         JSONObject log = Datastore.entityToJSON(Datastore.getMultipleEntitiesAsList("EventLog", filters));
         io.log("sending log ->" + log, Level.INFO, null);
