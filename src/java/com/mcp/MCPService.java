@@ -77,8 +77,8 @@ public class MCPService implements Serviceable {
         JSONObject request = worker.getRequestData();
         String script = request.optString("script");
         String requestId = new UniqueRandom(20).nextMixedRandom();
-        //String selfUrl = "https://" + getAppId() + ".appspot.com/server";
-        String selfUrl = "http://localhost:8200/server";
+        String selfUrl = "https://" + getAppId() + ".appspot.com/server";
+        //String selfUrl = "http://localhost:8200/server";
         io.log("self url -> "+selfUrl, Level.INFO, null);
         //inform other nodes that you are the aggregator
         String decodeScript = URLDecoder.decode(script, "utf-8");
