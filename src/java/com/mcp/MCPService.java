@@ -1,5 +1,10 @@
 package com.mcp;
 
+import com.google.appengine.api.datastore.Key;
+import com.google.appengine.api.datastore.KeyFactory;
+import com.google.appengine.api.datastore.Query.Filter;
+import com.google.appengine.api.datastore.Query.FilterOperator;
+import com.google.appengine.api.datastore.Query.FilterPredicate;
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.api.taskqueue.QueueFactory;
 import com.google.appengine.api.taskqueue.TaskOptions;
@@ -14,13 +19,11 @@ import com.quest.access.useraccess.services.Endpoint;
 import com.quest.access.useraccess.services.Serviceable;
 import com.quest.access.useraccess.services.WebService;
 import com.quest.servlets.ClientWorker;
-import java.io.Serializable;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Properties;
-import java.util.StringTokenizer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,10 +31,11 @@ import javax.mail.Session;
 import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
-import javax.servlet.ServletConfig;
 import javax.mail.Message;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
+import org.mozilla.javascript.NativeArray;
 
 /**
  *
@@ -42,13 +46,13 @@ public class MCPService implements Serviceable {
     
     private static ConcurrentHashMap<String, String> aggregatedData = new ConcurrentHashMap();
     
-    private static ConcurrentHashMap<String, ArrayList> eventLog = new ConcurrentHashMap();
-    
     //how many data fetches, this is loosely translated as how many
     //data aggregations are done for a given request id
     private static ConcurrentHashMap<String, Integer> fetchCount = new ConcurrentHashMap();
     
     private static ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
+    
+    private static ConcurrentHashMap<String, Long> lastLogFetch = new ConcurrentHashMap();
     
     private static String mcpScript;
     
@@ -73,8 +77,8 @@ public class MCPService implements Serviceable {
         JSONObject request = worker.getRequestData();
         String script = request.optString("script");
         String requestId = new UniqueRandom(20).nextMixedRandom();
-        String selfUrl = "https://" + getAppId() + ".appspot.com/server";
-        //String selfUrl = "http://localhost:8200/server";
+        //String selfUrl = "https://" + getAppId() + ".appspot.com/server";
+        String selfUrl = "http://localhost:8200/server";
         io.log("self url -> "+selfUrl, Level.INFO, null);
         //inform other nodes that you are the aggregator
         String decodeScript = URLDecoder.decode(script, "utf-8");
@@ -107,9 +111,8 @@ public class MCPService implements Serviceable {
             script = URLDecoder.decode(script, "utf-8");
             //check if we have already killed this process
             Boolean processKilled = killProcess.get(reqId);
-            if (processKilled != null && processKilled == true) {
+            if (processKilled != null && processKilled == true) 
                 return;
-            }
             //run the onFinish handler
             HashMap params = new HashMap();
             params.put("_all_data_", aggregatedData.get(reqId));
@@ -133,11 +136,67 @@ public class MCPService implements Serviceable {
     }
     
  
-    public void addLog(String reqId, String event){
-        ArrayList log = eventLog.get(reqId);
-        if(log == null) log = new ArrayList();
-        log.add(event);
-        eventLog.put(reqId, log);
+    public void addLog(String reqId, String event) {
+        try {
+            JSONObject values = new JSONObject();
+            values.put("request_id", reqId);
+            values.put("event", event);
+            values.put("created", System.currentTimeMillis());
+            createEntity("EventLog", values);
+        } catch (JSONException ex) {
+            Logger.getLogger(MCPService.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    public String createEntity(String entityName, JSONObject values){
+        Key k = Datastore.insert(entityName, values);
+        return KeyFactory.keyToString(k);
+    }
+    
+    private Object[][] getFilters(NativeArray filters) {
+        NativeArray root = (NativeArray) filters;
+        int rootLen = (int) root.getLength();
+        Object[][] filterz = new Object[rootLen][3];
+        for (int x = 0; x < rootLen; x++) {
+            NativeArray arr = (NativeArray) root.get(x);
+            Object[] filter = new Object[3];
+            for (int y = 0; y < 3; y++) {
+                filter[y] = arr.get(y);
+            }
+            filterz[x] = filter;
+        }
+        return filterz;
+    }
+
+    //filters: [["age", ">", 20], ["name", "=", "constant"]]
+    public JSONObject dbGet(String entityName, Object filters) {
+        NativeArray root = (NativeArray) filters;
+        return Datastore.getSingleEntity(entityName, getFilters(root));
+    }
+    
+    public JSONObject dbGetMultiple(String entityName, Object filters){
+        NativeArray root = (NativeArray) filters;
+        return Datastore.getMultipleEntities(entityName, getFilters(root)); 
+    }
+    
+    private static Filter equalFilter(String propName, Object value) {
+        return new FilterPredicate(propName, FilterOperator.EQUAL, value);
+    }
+    
+    private static Filter greaterThanFilter(String propName, Object value) {
+        return new FilterPredicate(propName, FilterOperator.GREATER_THAN, value);
+    }
+    
+    private static Filter greaterThanOrEqualFilter(String propName, Object value) {
+        return new FilterPredicate(propName, FilterOperator.GREATER_THAN_OR_EQUAL, value);
+    }
+    
+    private static Filter lessThanFilter(String propName, Object value) {
+        return new FilterPredicate(propName, FilterOperator.LESS_THAN, value);
+    }
+    
+    private static Filter lessThanOrEqualFilter(String propName, Object value) {
+        return new FilterPredicate(propName, FilterOperator.LESS_THAN_OR_EQUAL, value);
     }
     
     //runs on aggregator
@@ -145,12 +204,17 @@ public class MCPService implements Serviceable {
     public void fetchMessages(Server serv, ClientWorker worker){
         JSONObject request = worker.getRequestData();
         String reqId = request.optString("request_id");
-        ArrayList log = eventLog.get(reqId);
-        if(log == null) log = new ArrayList();
-        io.log("all logs ->"+eventLog, Level.INFO, null);
+        Long lastTimestamp = lastLogFetch.get(reqId);
+        if(lastTimestamp == null) lastTimestamp = 0l;
+        Filter[] filters = new Filter[]{
+            equalFilter("request_id", reqId),
+            greaterThanOrEqualFilter("created", lastTimestamp),
+            lessThanOrEqualFilter("created", System.currentTimeMillis()) 
+        };
+        JSONObject log = Datastore.entityToJSON(Datastore.getMultipleEntitiesAsList("EventLog", filters));
         io.log("sending log ->" + log, Level.INFO, null);
-        serv.messageToClient(worker.setResponseData(new JSONArray(log)));
-        eventLog.put(reqId, new ArrayList());
+        serv.messageToClient(worker.setResponseData(log));
+        lastLogFetch.put(reqId, System.currentTimeMillis());
     }
     
     @Endpoint(name = "bg_message")

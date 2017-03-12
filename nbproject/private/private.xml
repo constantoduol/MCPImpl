@@ -2,6 +2,12 @@
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
-        <group/>
+        <group>
+            <file>file:/media/conny/Linux%20Dev/Projects/NetBeansProjects/TestMCP/web/js/mcp_impl.js</file>
+            <file>file:/media/conny/Linux%20Dev/Projects/NetBeansProjects/TestMCP/src/java/com/mcp/MCPService.java</file>
+            <file>file:/media/conny/Linux%20Dev/Projects/NetBeansProjects/TestMCP/web/index.html</file>
+            <file>file:/media/conny/Linux%20Dev/Projects/NetBeansProjects/TestMCP/web/WEB-INF/queue.xml</file>
+            <file>file:/media/conny/Linux%20Dev/Projects/NetBeansProjects/TestMCP/web/js/app.js</file>
+        </group>
     </open-files>
 </project-private>
