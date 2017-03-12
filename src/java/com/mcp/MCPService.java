@@ -2,9 +2,11 @@ package com.mcp;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
+import com.google.appengine.api.datastore.Query;
 import com.google.appengine.api.datastore.Query.Filter;
 import com.google.appengine.api.datastore.Query.FilterOperator;
 import com.google.appengine.api.datastore.Query.FilterPredicate;
+import com.google.appengine.api.datastore.Query.SortDirection;
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.api.taskqueue.QueueFactory;
 import com.google.appengine.api.taskqueue.TaskOptions;
@@ -51,8 +53,6 @@ public class MCPService implements Serviceable {
     private static ConcurrentHashMap<String, Integer> fetchCount = new ConcurrentHashMap();
     
     private static ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
-    
-    private static ConcurrentHashMap<String, Long> lastLogFetch = new ConcurrentHashMap();
     
     private static String mcpScript;
     
@@ -142,6 +142,7 @@ public class MCPService implements Serviceable {
             values.put("request_id", reqId);
             values.put("event", event);
             values.put("created", System.currentTimeMillis());
+            values.put("seen", 0); // 0 for unread 1 for read
             createEntity("EventLog", values);
         } catch (JSONException ex) {
             Logger.getLogger(MCPService.class.getName()).log(Level.SEVERE, null, ex);
@@ -200,19 +201,16 @@ public class MCPService implements Serviceable {
     public void fetchMessages(Server serv, ClientWorker worker){
         JSONObject request = worker.getRequestData();
         String reqId = request.optString("request_id");
-        Long lastTimestamp = lastLogFetch.get(reqId);
-        if(lastTimestamp == null) lastTimestamp = 0l;
-        io.log("last timestamp -> "+lastTimestamp, Level.INFO, null);
-        io.log("current timestamp -> "+System.currentTimeMillis(), Level.INFO, null);
         Filter[] filters = new Filter[]{
             equalFilter("request_id", reqId),
-            greaterThanOrEqualFilter("created", lastTimestamp),
-            lessThanFilter("created", System.currentTimeMillis()) 
+            equalFilter("seen", 0)
         };
-        JSONObject log = Datastore.entityToJSON(Datastore.getMultipleEntitiesAsList("EventLog", filters));
+        JSONObject log = Datastore.entityToJSON(
+                Datastore.getMultipleEntitiesAsList("EventLog", "created", SortDirection.DESCENDING, filters)
+        );
+        Datastore.updateMultipeEntities("EventLog", new String[]{"seen"}, new Object[]{1}, filters);
         io.log("sending log ->" + log, Level.INFO, null);
         serv.messageToClient(worker.setResponseData(log));
-        lastLogFetch.put(reqId, System.currentTimeMillis());
     }
     
     @Endpoint(name = "bg_message")
