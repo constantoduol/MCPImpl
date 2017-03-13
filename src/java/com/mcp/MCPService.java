@@ -55,6 +55,10 @@ public class MCPService implements Serviceable {
     
     private static ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
     
+    private static ConcurrentHashMap<String, Long> lastLogFetch = new ConcurrentHashMap();
+    
+    private static ConcurrentHashMap<String, String> scripts = new ConcurrentHashMap();
+    
     private static String mcpScript;
     
     @Override
@@ -78,12 +82,13 @@ public class MCPService implements Serviceable {
         JSONObject request = worker.getRequestData();
         String script = request.optString("script");
         String requestId = new UniqueRandom(20).nextMixedRandom();
-        String selfUrl = "https://" + getAppId() + ".appspot.com/server";
-        //String selfUrl = "http://localhost:8200/server";
+        //String selfUrl = "https://" + getAppId() + ".appspot.com/server";
+        String selfUrl = "http://localhost:8200/server";
         io.log("self url -> "+selfUrl, Level.INFO, null);
         //inform other nodes that you are the aggregator
         String decodeScript = URLDecoder.decode(script, "utf-8");
         io.log(decodeScript, Level.INFO, MCPService.class);
+        scripts.put(requestId, decodeScript);
         Queue queue = QueueFactory.getDefaultQueue();
         queue.add(TaskOptions.Builder
                 .withPayload(new BackgroundTask(selfUrl, requestId, decodeScript, mcpScript))
@@ -107,9 +112,10 @@ public class MCPService implements Serviceable {
     private void killProcess(ClientWorker worker){
         JSONObject request = worker.getRequestData();
         String reqId = request.optString("request_id");
-        String script = request.optString("script");
+        //String script = request.optString("script");
         try {
-            script = URLDecoder.decode(script, "utf-8");
+            //script = URLDecoder.decode(script, "utf-8");
+            String script = scripts.get(reqId);
             //check if we have already killed this process
             Boolean processKilled = killProcess.get(reqId);
             if (processKilled != null && processKilled == true) 
@@ -127,6 +133,8 @@ public class MCPService implements Serviceable {
             killProcess.put(reqId, true);
             aggregatedData.remove(reqId);
             fetchCount.remove(reqId);
+            lastLogFetch.remove(reqId);
+            scripts.remove(reqId);
             io.log("on finish returned -> "+finishResult, Level.INFO, null);
             addLog(reqId, "process killed");
             addLog(reqId, "on finish called");
@@ -143,7 +151,6 @@ public class MCPService implements Serviceable {
             values.put("request_id", reqId);
             values.put("event", event);
             values.put("created", System.currentTimeMillis());
-            values.put("seen", 0); // 0 for unread 1 for read
             createEntity("EventLog", values);
         } catch (JSONException ex) {
             Logger.getLogger(MCPService.class.getName()).log(Level.SEVERE, null, ex);
@@ -202,15 +209,18 @@ public class MCPService implements Serviceable {
     public void fetchMessages(Server serv, ClientWorker worker){
         JSONObject request = worker.getRequestData();
         String reqId = request.optString("request_id");
+        Long lastTimestamp = lastLogFetch.get(reqId);
+        if(lastTimestamp == null) lastTimestamp = 0l;
         Filter[] filters = new Filter[]{
             equalFilter("request_id", reqId),
-            equalFilter("seen", 0)
+            greaterThanOrEqualFilter("created", lastTimestamp)
         };
         JSONObject log = Datastore.entityToJSON(
                 Datastore.getMultipleEntities("EventLog", "created", SortDirection.ASCENDING, filters)
         );
         Datastore.updateMultipeEntities("EventLog", new String[]{"seen"}, new Object[]{1}, filters);
         io.log("sending log ->" + log, Level.INFO, null);
+        lastLogFetch.put(reqId, System.currentTimeMillis());
         serv.messageToClient(worker.setResponseData(log));
     }
     
@@ -234,10 +244,11 @@ public class MCPService implements Serviceable {
             //the best way to aggregate is store the results
             //in java memory and load to javascript when needed
             String resp = request.optString("response");
-            String script = request.optString("script");
+            //String script = request.optString("script");
             updateFetchCount(reqId);
             //call the aggregate function with the response
-            script = URLDecoder.decode(script, "utf-8");
+            //script = URLDecoder.decode(script, "utf-8");
+            String script = scripts.get(reqId);
             io.log("aggregating data for req_id -> "+reqId, Level.INFO, null);
             //call the aggregate function with the response
             HashMap params = new HashMap(); 
@@ -247,6 +258,7 @@ public class MCPService implements Serviceable {
             params.put("_request_id_", reqId);
             params.put("_fetch_count_", fetchCount.get(reqId));
             String aggrScript = "\n" + "if(aggregate) aggregate();";
+            io.log(script, Level.INFO, null);
             Object result = Server.execScript(script + aggrScript, params);
             aggregatedData.put(reqId, (String)result);
             JSONObject respObj = new JSONObject();

@@ -121,22 +121,26 @@ App.prototype.processActions = function(events){
         var actionIndex = msg.lastIndexOf("action:", 0);
         if (actionIndex > -1) {
             //has action
-            var actions = msg.split(":");
-            var methodName = actions[1].substring(0, actions[1].indexOf("("));
-            if (app.allowedActions.indexOf(methodName)) {
-                window.eval(actions[1]);
+            var action = msg.substring(msg.indexOf(":") + 1);
+            console.log("discovered action: "+action);
+            var methodName = action.substring(0, action.indexOf("("));
+            if (app.allowedActions.indexOf(methodName) > -1) {
+                console.log("executing "+methodName);
+                window.eval(action);
             }
         }
     }
 };
 
-App.prototype.renderGraph = function(graphData){
-    var params = JSON.parse(graphData);
+App.prototype.renderGraph = function(params){
     var parseTime = params.parseTime || false;
     var labels = params.labels || [];
+    var title = params.title || "MCP Graph";
+    var id = "graph_" + (Math.random() * 1000000);
+    $("#graphs").append("<h4 style='text-align:center'>"+title+"</h4><div style='margin-bottom:20px' id="+id+"></div>");
     if(params.type === "line"){
         Morris.Line({
-            element: 'graph_area',
+            element: id,
             parseTime: parseTime,
             data: params.data, 
             xkey: params.xkey, 

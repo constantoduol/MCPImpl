@@ -2,7 +2,6 @@
 <datastore-indexes autoGenerate="true">
     <datastore-index kind="EventLog">
         <property name="request_id" direction="asc"/>
-        <property name="seen" direction="asc"/>
         <property name="created" direction="asc"/>
     </datastore-index>
 </datastore-indexes>
