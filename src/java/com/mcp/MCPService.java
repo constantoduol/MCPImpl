@@ -59,6 +59,7 @@ public class MCPService implements Serviceable {
     
     private static ConcurrentHashMap<String, String> scripts = new ConcurrentHashMap();
     
+    
     private static String mcpScript;
     
     @Override
@@ -136,8 +137,8 @@ public class MCPService implements Serviceable {
             lastLogFetch.remove(reqId);
             scripts.remove(reqId);
             io.log("on finish returned -> "+finishResult, Level.INFO, null);
-            addLog(reqId, "process killed");
-            addLog(reqId, "on finish called");
+            addLog(reqId, "process killed and onfinish called");
+            addLog(reqId, "action:app.stopPolling()");
         } catch (Exception e) {
             e.printStackTrace();
             addLog(reqId, e.getLocalizedMessage());
@@ -218,7 +219,6 @@ public class MCPService implements Serviceable {
         JSONObject log = Datastore.entityToJSON(
                 Datastore.getMultipleEntities("EventLog", "created", SortDirection.ASCENDING, filters)
         );
-        Datastore.updateMultipeEntities("EventLog", new String[]{"seen"}, new Object[]{1}, filters);
         io.log("sending log ->" + log, Level.INFO, null);
         lastLogFetch.put(reqId, System.currentTimeMillis());
         serv.messageToClient(worker.setResponseData(log));
