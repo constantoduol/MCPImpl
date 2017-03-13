@@ -130,12 +130,21 @@ App.prototype.processActions = function(events){
     }
 };
 
-App.prototype.renderGraph = function(type, data){
-    Morris.Line({
-        element: 'graph_area',
-        parseTime: false,
-        data: r, xkey: col1, ykeys: colNames, labels: colNames
-    });  
+App.prototype.renderGraph = function(graphData){
+    var params = JSON.parse(graphData);
+    var parseTime = params.parseTime || false;
+    var labels = params.labels || [];
+    if(params.type === "line"){
+        Morris.Line({
+            element: 'graph_area',
+            parseTime: parseTime,
+            data: params.data, 
+            xkey: params.xkey, 
+            ykeys: params.ykeys, 
+            labels: labels
+        });  
+    }
+    console.log("graph rendered");
 };
 
 window.app = new App();

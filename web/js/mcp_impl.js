@@ -44,8 +44,12 @@ function onFinish() {
     _service_.addLog(_request_id_, "on finish called");
     _service_.addLog(_request_id_, "action:app.stopPolling()");
     _service_.addLog(_request_id_, _all_data_);
-    //_service_.addLog(_request_id_, "action:app.renderGraph('line', "+_all_data_+")");
-    _service_.sendEmail(_request_id_, 
-            "constant@echomobile.org", "Hello World", _all_data_);
+    var graph_data = graph_object(
+        'line', 
+        'x', 
+        ['y1', 'y2'], 
+        ["Y ONE", "Y TWO"], 
+        [{x: 10, y1: 3, y2: 4}, {x:5, y1: 6, y2: 8}]);
+    _service_.addLog(_request_id_, "action:app.renderGraph("+graph_data+")");
     return true;
 }
