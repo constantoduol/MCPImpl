@@ -1,5 +1,6 @@
 package com.mcp;
 
+import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.api.datastore.Query;
@@ -206,12 +207,13 @@ public class MCPService implements Serviceable {
             equalFilter("seen", 0)
         };
         JSONObject log = Datastore.entityToJSON(
-                Datastore.getMultipleEntitiesAsList("EventLog", "created", SortDirection.DESCENDING, filters)
+                Datastore.getMultipleEntities("EventLog", "created", SortDirection.ASCENDING, filters)
         );
         Datastore.updateMultipeEntities("EventLog", new String[]{"seen"}, new Object[]{1}, filters);
         io.log("sending log ->" + log, Level.INFO, null);
         serv.messageToClient(worker.setResponseData(log));
     }
+    
     
     @Endpoint(name = "bg_message")
     public void bgMessage(Server serv, ClientWorker worker) {
@@ -220,6 +222,7 @@ public class MCPService implements Serviceable {
         String msg = request.optString("message");
         io.log("bg message received-> "+msg + " req_id : "+reqId, Level.INFO, null);
         addLog(reqId, msg);
+        serv.messageToClient(worker.setResponseData("success"));
     }
     
     //runs on aggregator

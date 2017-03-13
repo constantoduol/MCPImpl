@@ -42,7 +42,9 @@ function aggregate() {
 function onFinish() {
     var data = JSON.parse(_all_data_);
     _service_.addLog(_request_id_, "on finish called");
+    _service_.addLog(_request_id_, "action:app.stopPolling()");
     _service_.addLog(_request_id_, _all_data_);
+    //_service_.addLog(_request_id_, "action:app.renderGraph('line', "+_all_data_+")");
     _service_.sendEmail(_request_id_, 
             "constant@echomobile.org", "Hello World", _all_data_);
     return true;

@@ -6,24 +6,22 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
          <link href='css/bootstrap.min.css' rel='stylesheet' type='text/css'>
          <script type="text/javascript" src="js/jquery.js"></script>
+         <script type="text/javascript" src="js/morris/raphael-min.js"></script>
+         <script type="text/javascript" src="js/morris/morris.min.js"></script>
          <script type="text/javascript" src="js/app.js"></script>
+         
          <style>
-             body{
-                 overflow: hidden;
-             }
+   
              #editor { 
-                 position: absolute;
-                 top: 0;
-                 right: 500px;
-                 bottom: 100px;
-                 left: 0;
+                 width: 50%;
+                 height: 500px;
              }
              #logs {
                  padding:15px;
                  overflow: auto;
                  float: right;
-                 width:466px;
-                 height: 580px;
+                 width:49%;
+                 height: 500px;
              }
              
              .time {
@@ -36,10 +34,6 @@
                  color : green;
                  font-size: 11px;
              }
-             .buttons {
-                 position: absolute;
-                 top:600px;
-             }
              
              .buttons input {
                  margin: 10px;
@@ -47,7 +41,16 @@
          </style>
     </head>
     <body>
+        <div id="logs"></div>
         <div id="editor"></div>
+        <div class="buttons">
+            <input type="button" onclick="runScript()" class="btn btn-primary" value="Run Script"/>
+            <input type="button" onclick="app.killScript()" class="btn btn-primary" value="Kill Script"/>
+        </div>
+        <div>
+            <h3>Graphs</h3>
+            <div id="graphs"></div>
+        </div>
 
         <script src="js/ace/ace.js" type="text/javascript" charset="utf-8"></script>
         <script src="js/ace/theme-monokai.js" type="text/javascript" charset="utf-8"></script>
@@ -61,12 +64,6 @@
             }
         </script>
 
-        <div id="logs"></div>
-        
-        <div class="buttons">
-            <input type="button" onclick="runScript()" class="btn btn-primary" value="Run Script"/>
-            <input type="button" onclick="app.killScript()" class="btn btn-primary" value="Kill Script"/>
-        </div>
        
     </body>
 </html>

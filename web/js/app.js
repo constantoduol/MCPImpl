@@ -8,6 +8,10 @@ function App(){
     this.server = "/server";
 }
 
+App.prototype.allowedActions = ["app.renderGraph", "app.stopPolling"];
+
+App.prototype.interval = 0;
+
 App.prototype.runScript = function (editor) {
     var data = {
         script : encodeURIComponent(editor.getValue())
@@ -60,17 +64,28 @@ App.prototype.pollServer = function (reqId) {
     var data = {
         request_id : reqId
     };
-    setInterval(function(){
+    app.interval = setInterval(function(){
         app.xhr(data, "mcp_service", "fetch_messages", {
             success: function (resp) {
-                app.addLog(resp.response.data.event);
+                console.log(resp);
+                var events = resp.response.data.event;
+                if(events){
+                    app.addLog(events);
+                    app.processActions(events);
+                }
             },
             error: function (err) {
                 console.log(err);
             }
         });
     }, 5000);
+    
 
+};
+
+App.prototype.stopPolling = function(){
+    clearInterval(app.interval);
+    console.log("polling stopped");
 };
 
 
@@ -98,6 +113,29 @@ App.prototype.xhr = function (data, svc, msg, func) {
                 func.error(err, request.request_object);
         }
     });
+};
+
+App.prototype.processActions = function(events){
+    for(var x = 0; x < events.length; x++){
+        var msg = events[x];
+        var actionIndex = msg.lastIndexOf("action:", 0);
+        if (actionIndex > -1) {
+            //has action
+            var actions = msg.split(":");
+            var methodName = actions[1].substring(0, actions[1].indexOf("("));
+            if (app.allowedActions.indexOf(methodName)) {
+                window.eval(actions[1]);
+            }
+        }
+    }
+};
+
+App.prototype.renderGraph = function(type, data){
+    Morris.Line({
+        element: 'graph_area',
+        parseTime: false,
+        data: r, xkey: col1, ykeys: colNames, labels: colNames
+    });  
 };
 
 window.app = new App();
