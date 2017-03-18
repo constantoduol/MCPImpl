@@ -1,9 +1,3 @@
-/* 
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 function App(){
     this.server = "/server";
 }
@@ -11,6 +5,11 @@ function App(){
 App.prototype.allowedActions = ["app.renderGraph", "app.stopPolling"];
 
 App.prototype.interval = 0;
+
+App.prototype.lastLogIndex = 0;
+
+App.prototype.separator = "*!__sep__!*";
+
 
 App.prototype.runScript = function (editor) {
     var data = {
@@ -56,7 +55,7 @@ App.prototype.addLog = function(logs){
        logArea.prepend(logHtml);
        if(x === logs.length - 1) 
            logArea.prepend($("<div><span class='time'>"
-               +date+"</span><span class='log'>---------------------------------------</span></div>"));
+               +date+"</span><span class='log'>--------------------------------------------------------</span></div>"));
     });
 };
 
@@ -68,10 +67,13 @@ App.prototype.pollServer = function (reqId) {
         app.xhr(data, "mcp_service", "fetch_messages", {
             success: function (resp) {
                 console.log(resp);
-                var events = resp.response.data.event;
+                var events = resp.response.data.events;
+                var allEvents = events.split(app.separator);
+                var newEvents = allEvents.slice(app.lastLogIndex);
+                app.lastLogIndex = allEvents.length;
                 if(events){
-                    app.addLog(events);
-                    app.processActions(events);
+                    app.addLog(newEvents);
+                    app.processActions(newEvents);
                 }
             },
             error: function (err) {
@@ -101,6 +103,7 @@ App.prototype.xhr = function (data, svc, msg, func) {
         url: app.server,
         data: "json=" + encodeURIComponent(JSON.stringify(request)),
         dataFilter: function (data, type) {
+            console.log(data);
             var data = JSON.parse(data);
             return data;
         },

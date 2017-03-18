@@ -49,6 +49,5 @@ function onFinish() {
         ["Y ONE", "Y TWO"], 
         [{x: 10, y1: 3, y2: 4}, {x:5, y1: 6, y2: 8}]);
     _service_.addLog(_request_id_, "action:app.renderGraph("+graph_data+")");
-    _service_.addLog(_request_id_, "action:app.stopPolling()");
     return true;
 }

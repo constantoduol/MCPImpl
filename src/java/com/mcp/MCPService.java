@@ -3,11 +3,10 @@ package com.mcp;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
-import com.google.appengine.api.datastore.Query;
 import com.google.appengine.api.datastore.Query.Filter;
 import com.google.appengine.api.datastore.Query.FilterOperator;
 import com.google.appengine.api.datastore.Query.FilterPredicate;
-import com.google.appengine.api.datastore.Query.SortDirection;
+import com.google.appengine.api.datastore.Text;
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.api.taskqueue.QueueFactory;
 import com.google.appengine.api.taskqueue.TaskOptions;
@@ -25,7 +24,6 @@ import com.quest.servlets.ClientWorker;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -47,18 +45,15 @@ import org.mozilla.javascript.NativeArray;
 @WebService(name="mcp_service",privileged = "no")
 public class MCPService implements Serviceable {
     
-    private static ConcurrentHashMap<String, String> aggregatedData = new ConcurrentHashMap();
+    private static volatile ConcurrentHashMap<String, String> aggregatedData = new ConcurrentHashMap();
     
     //how many data fetches, this is loosely translated as how many
     //data aggregations are done for a given request id
-    private static ConcurrentHashMap<String, Integer> fetchCount = new ConcurrentHashMap();
+    private static volatile ConcurrentHashMap<String, Integer> fetchCount = new ConcurrentHashMap();
     
-    private static ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
+    private static volatile ConcurrentHashMap<String, Boolean> killProcess = new ConcurrentHashMap();
     
-    private static ConcurrentHashMap<String, Long> lastLogFetch = new ConcurrentHashMap();
-    
-    private static ConcurrentHashMap<String, String> scripts = new ConcurrentHashMap();
-    
+    private static String SEPARATOR = "*!__sep__!*";
     
     private static String mcpScript;
     
@@ -83,13 +78,18 @@ public class MCPService implements Serviceable {
         JSONObject request = worker.getRequestData();
         String script = request.optString("script");
         String requestId = new UniqueRandom(20).nextMixedRandom();
-        //String selfUrl = "https://" + getAppId() + ".appspot.com/server";
-        String selfUrl = "http://localhost:8200/server";
+        String selfUrl = "https://" + getAppId() + ".appspot.com/server";
+        //String selfUrl = "http://localhost:8200/server";
         io.log("self url -> "+selfUrl, Level.INFO, null);
         //inform other nodes that you are the aggregator
         String decodeScript = URLDecoder.decode(script, "utf-8");
         io.log(decodeScript, Level.INFO, MCPService.class);
-        scripts.put(requestId, decodeScript);
+        HashMap m = new HashMap();
+        m.put("value", new Text(decodeScript));
+        m.put("request_id", requestId);
+        m.put("created", System.currentTimeMillis());
+        Datastore.insert("Script", m);
+        
         Queue queue = QueueFactory.getDefaultQueue();
         queue.add(TaskOptions.Builder
                 .withPayload(new BackgroundTask(selfUrl, requestId, decodeScript, mcpScript))
@@ -108,7 +108,15 @@ public class MCPService implements Serviceable {
         serv.messageToClient(worker.setResponseData("success"));
     }
     
-
+    private String getScript(String requestId){
+        Filter[] filters = new Filter[]{
+            equalFilter("request_id", requestId)
+        };
+        Entity en = Datastore.getSingleEntity("Script", filters);
+        Text txt =  (Text)en.getProperty("value");
+        return txt.getValue();
+    }
+    
     //runs on aggregator
     private void killProcess(ClientWorker worker){
         JSONObject request = worker.getRequestData();
@@ -116,7 +124,7 @@ public class MCPService implements Serviceable {
         //String script = request.optString("script");
         try {
             //script = URLDecoder.decode(script, "utf-8");
-            String script = scripts.get(reqId);
+            String script = getScript(reqId);
             //check if we have already killed this process
             Boolean processKilled = killProcess.get(reqId);
             if (processKilled != null && processKilled == true) 
@@ -134,11 +142,10 @@ public class MCPService implements Serviceable {
             killProcess.put(reqId, true);
             aggregatedData.remove(reqId);
             fetchCount.remove(reqId);
-            lastLogFetch.remove(reqId);
-            scripts.remove(reqId);
             io.log("on finish returned -> "+finishResult, Level.INFO, null);
             addLog(reqId, "process killed and onfinish called");
             addLog(reqId, "action:app.stopPolling()");
+            addLog(reqId, "!!quit");
         } catch (Exception e) {
             e.printStackTrace();
             addLog(reqId, e.getLocalizedMessage());
@@ -146,16 +153,43 @@ public class MCPService implements Serviceable {
     }
     
  
-    public void addLog(String reqId, String event) {
-        try {
-            JSONObject values = new JSONObject();
-            values.put("request_id", reqId);
-            values.put("event", event);
-            values.put("created", System.currentTimeMillis());
-            createEntity("EventLog", values);
-        } catch (JSONException ex) {
-            Logger.getLogger(MCPService.class.getName()).log(Level.SEVERE, null, ex);
+    public synchronized void addLog(String reqId, String event) {
+        Filter[] filters = new Filter[]{
+            equalFilter("request_id", reqId)
+        };
+        Entity en = Datastore.getSingleEntity("EventLog", filters);
+        if(en != null) {
+            Text log = (Text)en.getProperty("value");
+            String logValue = log.getValue();
+            logValue += SEPARATOR + event;
+            Datastore.updateSingleEntity("EventLog", new String[]{"value"}, new Object[]{new Text(logValue)}, filters);
+        } else {
+            en = new Entity("EventLog");
+            en.setProperty("value", new Text(event));
+            en.setProperty("created", System.currentTimeMillis());
+            en.setProperty("request_id", reqId);
+            Datastore.insert(en);
         }
+    }
+    
+    @Endpoint(name="fetch_messages")
+    public void fetchMessages(Server serv, ClientWorker worker) throws JSONException{
+        JSONObject request = worker.getRequestData();
+        String reqId = request.optString("request_id");
+        Filter[] filters = new Filter[]{
+            equalFilter("request_id", reqId)
+        };
+        Entity en = Datastore.getSingleEntity("EventLog", filters);
+        String log = "";
+        if(en != null) log = ((Text)en.getProperty("value")).getValue();
+        io.log("sending log ->" + log, Level.INFO, null);
+        if(log.length() > 0 && log.contains("!!quit")) {
+            Datastore.deleteSingleEntity("EventLog", filters);
+            Datastore.deleteSingleEntity("Script", filters);
+        }
+        JSONObject data = new JSONObject();
+        data.put("events", log);
+        serv.messageToClient(worker.setResponseData(data));
     }
     
     public String createEntity(String entityName, JSONObject values){
@@ -205,24 +239,6 @@ public class MCPService implements Serviceable {
         return new FilterPredicate(propName, FilterOperator.LESS_THAN, value);
     }
     
-    //runs on aggregator
-    @Endpoint(name="fetch_messages")
-    public void fetchMessages(Server serv, ClientWorker worker){
-        JSONObject request = worker.getRequestData();
-        String reqId = request.optString("request_id");
-        Long lastTimestamp = lastLogFetch.get(reqId);
-        if(lastTimestamp == null) lastTimestamp = 0l;
-        Filter[] filters = new Filter[]{
-            equalFilter("request_id", reqId),
-            greaterThanOrEqualFilter("created", lastTimestamp)
-        };
-        JSONObject log = Datastore.entityToJSON(
-                Datastore.getMultipleEntities("EventLog", "created", SortDirection.ASCENDING, filters)
-        );
-        io.log("sending log ->" + log, Level.INFO, null);
-        lastLogFetch.put(reqId, System.currentTimeMillis());
-        serv.messageToClient(worker.setResponseData(log));
-    }
     
     
     @Endpoint(name = "bg_message")
@@ -234,6 +250,8 @@ public class MCPService implements Serviceable {
         addLog(reqId, msg);
         serv.messageToClient(worker.setResponseData("success"));
     }
+    
+
     
     //runs on aggregator
     @Endpoint(name="aggregate")
@@ -248,7 +266,7 @@ public class MCPService implements Serviceable {
             updateFetchCount(reqId);
             //call the aggregate function with the response
             //script = URLDecoder.decode(script, "utf-8");
-            String script = scripts.get(reqId);
+            String script = getScript(reqId);
             io.log("aggregating data for req_id -> "+reqId, Level.INFO, null);
             //call the aggregate function with the response
             HashMap params = new HashMap(); 
@@ -258,7 +276,7 @@ public class MCPService implements Serviceable {
             params.put("_request_id_", reqId);
             params.put("_fetch_count_", fetchCount.get(reqId));
             String aggrScript = "\n" + "if(aggregate) aggregate();";
-            io.log(script, Level.INFO, null);
+            //io.log(script, Level.INFO, null);
             Object result = Server.execScript(script + aggrScript, params);
             aggregatedData.put(reqId, (String)result);
             JSONObject respObj = new JSONObject();
