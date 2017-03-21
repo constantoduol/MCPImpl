@@ -45,7 +45,7 @@ import org.mozilla.javascript.NativeArray;
 @WebService(name="mcp_service",privileged = "no")
 public class MCPService implements Serviceable {
     
-    private static volatile ConcurrentHashMap<String, String> aggregatedData = new ConcurrentHashMap();
+    private static volatile ConcurrentHashMap<String, String> reducedData = new ConcurrentHashMap();
     
     //how many data fetches, this is loosely translated as how many
     //data aggregations are done for a given request id
@@ -131,16 +131,16 @@ public class MCPService implements Serviceable {
                 return;
             //run the onFinish handler
             HashMap params = new HashMap();
-            params.put("_all_data_", aggregatedData.get(reqId));
+            params.put("_all_data_", reducedData.get(reqId));
             params.put("_request_id_", reqId);
             params.put("_service_", this);
             params.put("_fetch_count_", fetchCount.get(reqId));
             String onFinish = "\n" + "if(onFinish) onFinish();";
-            //call the aggregate function with the response
+            //call the reduce function with the response
     
             Object finishResult = Server.execScript(mcpScript + script + onFinish, params);
             killProcess.put(reqId, true);
-            aggregatedData.remove(reqId);
+            reducedData.remove(reqId);
             fetchCount.remove(reqId);
             io.log("on finish returned -> "+finishResult, Level.INFO, null);
             addLog(reqId, "process killed and onfinish called");
@@ -254,31 +254,31 @@ public class MCPService implements Serviceable {
 
     
     //runs on aggregator
-    @Endpoint(name="aggregate")
-    public synchronized void aggregate(Server serv, ClientWorker worker) {
+    @Endpoint(name="reduce")
+    public synchronized void reduce(Server serv, ClientWorker worker) {
         JSONObject request = worker.getRequestData();
         String reqId = request.optString("request_id");
         try {
-            //the best way to aggregate is store the results
+            //the best way to reduce is store the results
             //in java memory and load to javascript when needed
             String resp = request.optString("response");
             //String script = request.optString("script");
             updateFetchCount(reqId);
-            //call the aggregate function with the response
+            //call the reduce function with the response
             //script = URLDecoder.decode(script, "utf-8");
             String script = getScript(reqId);
             io.log("aggregating data for req_id -> "+reqId, Level.INFO, null);
-            //call the aggregate function with the response
+            //call the reduce function with the response
             HashMap params = new HashMap(); 
-            params.put("_aggregated_data_", aggregatedData.get(reqId));
+            params.put("_reduced_data_", reducedData.get(reqId));
             params.put("_new_data_", URLDecoder.decode(resp, "utf-8"));
             params.put("_service_", this);
             params.put("_request_id_", reqId);
             params.put("_fetch_count_", fetchCount.get(reqId));
-            String aggrScript = "\n" + "if(aggregate) aggregate();";
+            String aggrScript = "\n" + "if(reduce) reduce();";
             //io.log(script, Level.INFO, null);
             Object result = Server.execScript(script + aggrScript, params);
-            aggregatedData.put(reqId, (String)result);
+            reducedData.put(reqId, (String)result);
             JSONObject respObj = new JSONObject();
             respObj.put("fetch_count", fetchCount.get(reqId));
             respObj.put("kill_process", killProcess.get(reqId));

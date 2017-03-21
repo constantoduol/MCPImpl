@@ -10,8 +10,11 @@ App.prototype.lastLogIndex = 0;
 
 App.prototype.separator = "*!__sep__!*";
 
+App.prototype.POLL_INTERVAL = 2000;
+
 
 App.prototype.runScript = function (editor) {
+    app.disableRun();
     var data = {
         script : encodeURIComponent(editor.getValue())
     };
@@ -20,12 +23,22 @@ App.prototype.runScript = function (editor) {
         success: function(resp){
             app.requestId = resp.response.data;
             app.addLog(["Request received, processing initiated"]);
+            app.lastLogIndex = 0;
             app.pollServer(app.requestId);
+            app.enableRun();
         },
         error: function(err){
             console.log(err);
         }
     });
+};
+
+App.prototype.disableRun = function(){
+  $("#run_script_btn").attr("disabled", "disabled");  
+};
+
+App.prototype.enableRun = function(){
+  $("#run_script_btn").removeAttr("disabled");  
 };
 
 App.prototype.killScript = function () {
@@ -70,17 +83,20 @@ App.prototype.pollServer = function (reqId) {
                 var events = resp.response.data.events;
                 var allEvents = events.split(app.separator);
                 var newEvents = allEvents.slice(app.lastLogIndex);
-                app.lastLogIndex = allEvents.length;
                 if(events){
+                    app.lastLogIndex = allEvents.length;
                     app.addLog(newEvents);
                     app.processActions(newEvents);
+                    console.log(app.lastLogIndex);
+                } else {
+                    app.addLog(["still processing"]);
                 }
             },
             error: function (err) {
                 console.log(err);
             }
         });
-    }, 5000);
+    }, app.POLL_INTERVAL);
     
 
 };
