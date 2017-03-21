@@ -5,8 +5,12 @@ limits = {
 };
 
 //filters = {
-//    "Account": [{
-//      "email": "pedro@echomobile.org"}]
+//    "Account": 
+//      {
+//      "email": "pedro@echomobile.org", _type_email: "str",
+//      "name": "pedro", _type_name: "str"
+//      },
+//     "Account!#1"
 //};
 
 
