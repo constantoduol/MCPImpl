@@ -155,8 +155,18 @@ App.prototype.renderGraph = function(params){
     var parseTime = params.parseTime || false;
     var labels = params.labels || [];
     var title = params.title || "MCP Graph";
+    var stats = params.stats || [];
     var id = "graph_" + (Math.random() * 1000000);
-    $("#graphs").append("<h4 style='text-align:center'>"+title+"</h4><div style='margin-bottom:20px' id="+id+"></div>");
+    var graphArea = $("#graphs");
+    var title = $("<h4 style='text-align:center'>"+title+"</h4>");
+    var graph = $("<div style='margin-bottom:20px' id="+id+"></div>");
+    var graphStats = $("<div></div>");
+    for(var x = 0; x < stats.length; x++){
+        graphStats.append("<span class='stat'>"+stats[x]+"</span>");
+    }
+    graphArea.append(title);
+    graphArea.append(graphStats);
+    graphArea.append(graph);
     if(params.type === "line"){
         Morris.Line({
             element: id,

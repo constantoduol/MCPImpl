@@ -22,7 +22,10 @@ import com.quest.access.useraccess.services.Serviceable;
 import com.quest.access.useraccess.services.WebService;
 import com.quest.servlets.ClientWorker;
 import java.net.URLDecoder;
+import java.text.DateFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
@@ -78,8 +81,8 @@ public class MCPService implements Serviceable {
         JSONObject request = worker.getRequestData();
         String script = request.optString("script");
         String requestId = new UniqueRandom(20).nextMixedRandom();
-        String selfUrl = "https://" + getAppId() + ".appspot.com/server";
-        //String selfUrl = "http://localhost:8200/server";
+        //String selfUrl = "https://" + getAppId() + ".appspot.com/server";
+        String selfUrl = "http://localhost:8200/server";
         io.log("self url -> "+selfUrl, Level.INFO, null);
         //inform other nodes that you are the aggregator
         String decodeScript = URLDecoder.decode(script, "utf-8");
@@ -328,7 +331,8 @@ public class MCPService implements Serviceable {
         }
     }
     
-    public static void main(String [] args){
-      io.out(Server.streamToString(Server.class.getResourceAsStream("Server.java")));
+    public static void main(String [] args) throws ParseException{
+      io.out(new Date("2013-01-01"));
+              
     }
 }
